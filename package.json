@@ -1,0 +1,28 @@
+{
+  "name": "bap-road",
+  "version": "1.0.0",
+  "description": "밥길 포인트 - 토큰 결제 / 포인트 정산 컨트랙트",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nasuzz/bap-road.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/nasuzz/bap-road/issues"
+  },
+  "homepage": "https://github.com/nasuzz/bap-road#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.29.1"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.6.1"
+  }
+}
