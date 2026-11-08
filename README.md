@@ -12,6 +12,7 @@
 | `contracts/mocks/FailingToken.sol` | 테스트 전용. 전송 실패를 일으키는 모의 토큰 |
 | `test/BabgilPoint.test.js` | 발표 시나리오 + 막히는 장면 + 환불 + 전송 실패 테스트 |
 | `scripts/demo.js` | 로컬에서 시나리오 ①~⑤를 실행하고 잔액표 출력 |
+| `web/` | 메타마스크로 연결하는 시연 웹 (학생 / 매장 / 전체 현황) |
 
 ## 컨트랙트 함수
 
@@ -52,6 +53,20 @@ npx hardhat run scripts/demo.js   # 시나리오 잔액표 출력
 10. `requiredReserve()`, `reserveBalance()`, `isFullyBacked()`로 확인하고, 거래 해시를 Sepolia Etherscan에서 확인해요.
 
 메타마스크에 BGP / tKRW 토큰을 "토큰 가져오기"로 추가하면 잔액이 보여요 (소수점 0). 포인트는 ERC-20이 아니라서 웹 / `pointBalanceOf`로 확인해요.
+
+## 웹 화면 실행
+
+1. `web/config.js`에 배포한 `tkrw`, `babgil` 주소(필요하면 `deployBlock`)를 넣어요.
+2. `npm run web` → 브라우저에서 http://localhost:5173 접속 → **메타마스크 연결**
+3. 메타마스크 계정을 바꾸면 화면이 자동으로 새로고침되고, 역할(운영자 / 매장 / 학생)에 맞는 정보가 보여요.
+
+| 탭 | 할 수 있는 것 |
+|---|---|
+| 학생 | BGP / 포인트 / tKRW 잔액, 시연용 tKRW 받기, 충전(승인 + 충전), 결제 대기 주문 결제(포인트 전액 사용), BGP 반환, 주문 내역 |
+| 매장 | 주문 등록, 매장 주문 목록, 포인트 적립(승인 + 적립), 환불 |
+| 전체 현황 | BGP 총공급 / 미사용 포인트 / 필요 재원 / 보관 tKRW, 참여 매장, 온체인 거래 기록, 이 브라우저에서 보낸 거래 해시 (표로 복사) |
+
+컨트랙트를 수정했다면 `npm run abi`로 `web/abi.js`를 다시 만들어요.
 
 ## 테스트 범위
 

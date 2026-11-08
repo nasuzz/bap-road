@@ -4,7 +4,9 @@
   "description": "밥길 포인트 - 토큰 결제 / 포인트 정산 컨트랙트",
   "scripts": {
     "compile": "hardhat compile",
-    "test": "hardhat test"
+    "test": "hardhat test",
+    "web": "node scripts/serve.js",
+    "abi": "hardhat compile && node scripts/export-abi.js"
   },
   "repository": {
     "type": "git",
