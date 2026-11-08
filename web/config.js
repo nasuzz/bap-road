@@ -3,6 +3,8 @@ export const CONFIG = {
   chainId: 11155111, // Sepolia
   chainName: "Sepolia",
   explorer: "https://sepolia.etherscan.io",
+  // 지갑 없이도 현황을 읽을 공개 RPC
+  rpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
 
   tkrw: "0x8645F7b1465DC39186209b57162c7F14BF0a24b3", // TKRW
   babgil: "0x4204a19535B63c95B6E635f9525C21A36C42714E", // BabgilPoint

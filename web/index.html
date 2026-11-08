@@ -4,147 +4,243 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>밥길 포인트</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="logo">밥</span>
+      <div class="logo">밥</div>
       <div>
         <h1>밥길 포인트</h1>
-        <p class="sub">토큰 결제 · 포인트 적립 · 매장 정산</p>
+        <p>교내 식당 · 카페 토큰 결제</p>
       </div>
     </div>
-    <div class="wallet">
-      <div id="account" class="account hidden"></div>
-      <button id="connectBtn" class="btn primary">메타마스크 연결</button>
+    <div class="top-right">
+      <span class="net"><i></i><span id="netName">Sepolia</span></span>
+      <div id="acct" class="acct hidden">
+        <span id="acctAvatar" class="avatar">학</span>
+        <div class="acct-text"><b id="acctName">-</b><small id="acctAddr">-</small></div>
+      </div>
+      <button id="connectBtn" class="btn primary">지갑 연결</button>
     </div>
   </header>
 
   <div id="notice" class="notice hidden"></div>
 
-  <nav class="tabs" role="tablist">
-    <button class="tab active" data-tab="student">학생</button>
-    <button class="tab" data-tab="store">매장</button>
-    <button class="tab" data-tab="overview">전체 현황</button>
+  <!-- 연결 전 소개 -->
+  <section id="hero" class="hero">
+    <div class="hero-text">
+      <span class="eyebrow">밥길 포인트</span>
+      <h2>식당에서 쌓은 포인트,<br />카페에서도 그대로.</h2>
+      <p>학생은 충전한 토큰(BGP)으로 결제하고, 포인트는 모든 참여 매장에서 함께 써요.<br />돈은 스마트 컨트랙트가 보관하고, 결제와 동시에 매장에 정산돼요.</p>
+      <button id="heroConnect" class="btn primary lg">메타마스크로 시작하기</button>
+    </div>
+    <ol class="hero-steps">
+      <li><span>1</span><b>충전</b><small>tKRW → BGP</small></li>
+      <li><span>2</span><b>결제</b><small>BGP · 포인트</small></li>
+      <li><span>3</span><b>적립</b><small>매장이 재원 부담</small></li>
+      <li><span>4</span><b>정산</b><small>매장에 즉시 지급</small></li>
+    </ol>
+  </section>
+
+  <nav class="seg" role="tablist">
+    <button class="seg-btn" data-tab="student"><span class="ic">🎓</span>학생</button>
+    <button class="seg-btn" data-tab="store"><span class="ic">🏪</span>매장</button>
+    <button class="seg-btn active" data-tab="overview"><span class="ic">📊</span>전체 현황</button>
   </nav>
 
   <main>
-    <!-- 학생 -->
-    <section id="tab-student" class="panel">
-      <div class="stats">
-        <div class="stat"><span class="label">결제용 토큰</span><span class="value" id="sBgp">-</span><span class="unit">BGP</span></div>
-        <div class="stat accent"><span class="label">적립 포인트</span><span class="value" id="sPoints">-</span><span class="unit">점</span></div>
-        <div class="stat muted"><span class="label">지갑 tKRW</span><span class="value" id="sTkrw">-</span><span class="unit">tKRW</span></div>
-      </div>
+    <!-- ================= 학생 ================= -->
+    <section id="tab-student" class="panel hidden">
+      <div class="need-wallet empty-state hidden"><div class="big">🎓</div><p>지갑을 연결하면 내 잔액과 결제 요청이 보여요.</p></div>
 
-      <div class="grid2">
-        <div class="card">
-          <h2>충전</h2>
-          <p class="hint">tKRW를 맡기면 같은 수량의 BGP를 받아요. 승인과 충전, 두 번 서명해요.</p>
-          <div class="row">
-            <input id="depositAmt" type="number" min="1" step="1" value="10000" />
-            <button id="depositBtn" class="btn primary" data-needs-wallet>충전</button>
+      <div class="wallet-area">
+        <div class="wallet-card">
+          <div class="wc-top">
+            <span>결제 가능 금액</span>
+            <span class="wc-chip">BGP + 포인트</span>
           </div>
-          <button id="faucetBtn" class="btn link" data-needs-wallet>시연용 tKRW 50,000 받기</button>
+          <div class="wc-total"><b id="sTotal">0</b><span>원</span></div>
+          <div class="wc-split">
+            <div><small>결제용 토큰</small><b id="sBgp">0</b><em>BGP</em></div>
+            <div class="pt"><small>적립 포인트</small><b id="sPoints">0</b><em>P</em></div>
+          </div>
+          <div class="wc-actions">
+            <button id="openDeposit" class="btn white" data-needs-wallet>＋ 충전</button>
+            <button id="openRedeem" class="btn ghost-white" data-needs-wallet>BGP 반환</button>
+          </div>
+          <div class="wc-foot">지갑 tKRW <b id="sTkrw">0</b> · <button id="faucetBtn" class="linklike" data-needs-wallet>시연용 tKRW 받기</button></div>
         </div>
 
-        <div class="card">
-          <h2>BGP 반환</h2>
-          <p class="hint">쓰지 않은 BGP를 소각하고 같은 수량의 tKRW를 돌려받아요. 포인트는 반환 대상이 아니에요.</p>
-          <div class="row">
-            <input id="redeemAmt" type="number" min="1" step="1" placeholder="반환할 BGP" />
-            <button id="redeemBtn" class="btn" data-needs-wallet>반환</button>
-          </div>
+        <div class="col">
+          <div class="section-title"><h3>결제 요청</h3><span id="pendingCount" class="count">0</span></div>
+          <div id="pendingOrders" class="stack"></div>
+
+          <div class="section-title"><h3>이용 내역</h3></div>
+          <ul id="myOrders" class="hist-list"></ul>
         </div>
-      </div>
-
-      <div class="card">
-        <h2>결제 대기 주문</h2>
-        <div id="pendingOrders" class="orders"><p class="empty">결제할 주문이 없어요.</p></div>
-      </div>
-
-      <div class="card">
-        <h2>내 주문 내역</h2>
-        <div id="myOrders"><p class="empty">아직 주문이 없어요.</p></div>
       </div>
     </section>
 
-    <!-- 매장 -->
+    <!-- ================= 매장 ================= -->
     <section id="tab-store" class="panel hidden">
-      <div id="storeNotRegistered" class="card hidden">
-        <p>현재 계정은 등록된 매장이 아니에요. 메타마스크에서 매장 계정으로 바꿔 주세요.</p>
+      <div class="need-wallet empty-state hidden"><div class="big">🏪</div><p>지갑을 연결하면 매장 화면이 보여요.</p></div>
+      <div id="storeNotRegistered" class="empty-state hidden">
+        <div class="big">🔒</div>
+        <p><b>현재 계정은 등록된 매장이 아니에요.</b><br />메타마스크에서 식당 또는 카페 계정으로 바꿔 주세요.</p>
       </div>
 
       <div id="storeArea" class="hidden">
-        <div class="stats">
-          <div class="stat"><span class="label">매장</span><span class="value small" id="stName">-</span><span class="unit" id="stRate"></span></div>
-          <div class="stat accent"><span class="label">정산 수령 (지갑 tKRW)</span><span class="value" id="stTkrw">-</span><span class="unit">tKRW</span></div>
-          <div class="stat muted"><span class="label">적립 대기</span><span class="value" id="stPendingReward">-</span><span class="unit">건</span></div>
-        </div>
-
-        <div class="card">
-          <h2>주문 등록</h2>
-          <p class="hint">구매자 · 금액 · 결제 가능 시간을 확정해요.</p>
-          <div class="form">
-            <label>구매자 주소<input id="orderBuyer" type="text" placeholder="0x..." /></label>
-            <label>금액 (tKRW)<input id="orderAmt" type="number" min="1" step="1" value="6000" /></label>
-            <label>결제 가능 시간 (분)<input id="orderMin" type="number" min="1" max="1440" step="1" value="10" /></label>
-            <button id="createOrderBtn" class="btn primary" data-needs-wallet>주문 등록</button>
+        <div class="store-head">
+          <div class="store-id">
+            <div id="stIcon" class="store-ic lg">🍚</div>
+            <div><h2 id="stName">-</h2><span id="stRate" class="pill">-</span></div>
+          </div>
+          <div class="store-kpis">
+            <div><small>정산 받은 tKRW</small><b id="stTkrw">0</b></div>
+            <div><small>결제 대기</small><b id="stWaiting">0</b></div>
+            <div><small>적립 대기</small><b id="stPendingReward">0</b></div>
           </div>
         </div>
 
-        <div class="card">
-          <h2>매장 주문</h2>
-          <div id="storeOrders"><p class="empty">등록한 주문이 없어요.</p></div>
+        <div class="pos">
+          <div class="card pos-form">
+            <h3>새 주문</h3>
+            <label class="field">
+              <span>구매자</span>
+              <select id="orderBuyerSel"></select>
+              <input id="orderBuyer" class="hidden" type="text" placeholder="0x... 학생 지갑 주소" />
+            </label>
+            <label class="field">
+              <span>금액</span>
+              <div class="amount-input"><input id="orderAmt" type="number" min="1" step="1" value="6000" /><em>원</em></div>
+              <div class="chips" id="amtChips">
+                <button type="button" data-amt="3000">3,000</button>
+                <button type="button" data-amt="4500">4,500</button>
+                <button type="button" data-amt="6000">6,000</button>
+                <button type="button" data-amt="9000">9,000</button>
+              </div>
+            </label>
+            <div class="field">
+              <span>결제 가능 시간</span>
+              <div class="chips" id="minChips">
+                <button type="button" data-min="5">5분</button>
+                <button type="button" data-min="10" class="on">10분</button>
+                <button type="button" data-min="30">30분</button>
+                <button type="button" data-min="60">1시간</button>
+              </div>
+            </div>
+            <div id="orderPreview" class="preview"></div>
+            <button id="createOrderBtn" class="btn primary block lg" data-needs-wallet>결제 요청 보내기</button>
+          </div>
+
+          <div class="board">
+            <div class="lane">
+              <div class="lane-h"><span class="dot wait"></span>결제 대기 <em id="laneWaitN">0</em></div>
+              <div id="laneWait" class="stack"></div>
+            </div>
+            <div class="lane">
+              <div class="lane-h"><span class="dot todo"></span>적립 필요 <em id="laneTodoN">0</em></div>
+              <div id="laneTodo" class="stack"></div>
+            </div>
+            <div class="lane">
+              <div class="lane-h"><span class="dot done"></span>완료 <em id="laneDoneN">0</em></div>
+              <div id="laneDone" class="stack"></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- 전체 현황 -->
-    <section id="tab-overview" class="panel hidden">
-      <div class="stats four">
-        <div class="stat"><span class="label">BGP 총공급</span><span class="value" id="oSupply">-</span></div>
-        <div class="stat"><span class="label">미사용 포인트</span><span class="value" id="oPoints">-</span></div>
-        <div class="stat"><span class="label">필요 재원</span><span class="value" id="oRequired">-</span></div>
-        <div class="stat accent"><span class="label">보관 tKRW</span><span class="value" id="oReserve">-</span></div>
+    <!-- ================= 전체 현황 ================= -->
+    <section id="tab-overview" class="panel">
+      <div class="flow card">
+        <div class="flow-node">
+          <div class="fn-ic">🎓</div>
+          <b>학생</b>
+          <div class="fn-v"><span id="fSupply">-</span><small>BGP</small></div>
+          <div class="fn-v pt"><span id="fPoints">-</span><small>포인트</small></div>
+        </div>
+        <div class="flow-arrow"><span>충전 · 결제</span></div>
+        <div class="flow-node core">
+          <div class="fn-ic">🔐</div>
+          <b>밥길 컨트랙트</b>
+          <div class="fn-v"><span id="fReserve">-</span><small>tKRW 보관</small></div>
+          <div id="fBacked" class="fn-badge">-</div>
+        </div>
+        <div class="flow-arrow"><span>tKRW 정산</span></div>
+        <div class="flow-node">
+          <div class="fn-ic">🏪</div>
+          <b>매장</b>
+          <div class="fn-v"><span id="fStores">-</span><small>tKRW 수령</small></div>
+        </div>
       </div>
-      <div id="backedBadge" class="banner">-</div>
-      <p class="hint center">필요 재원 = BGP 총공급 + 미사용 포인트. 보관 tKRW가 이보다 크거나 같아야 해요.</p>
 
       <div class="grid2">
         <div class="card">
-          <h2>참여 매장</h2>
-          <div id="storeList"><p class="empty">-</p></div>
+          <h3>지급 재원</h3>
+          <p class="muted">필요 재원 = BGP 총공급 + 미사용 포인트. 보관 tKRW가 이보다 크거나 같아야 해요.</p>
+          <div class="gauge">
+            <div class="g-row"><span>필요 재원</span><div class="g-bar"><i id="gBgp" class="g-bgp"></i><i id="gPt" class="g-pt"></i></div><b id="gRequired">-</b></div>
+            <div class="g-row"><span>보관 tKRW</span><div class="g-bar"><i id="gReserve" class="g-res"></i></div><b id="gReserveV">-</b></div>
+          </div>
+          <div class="legend"><span><i class="g-bgp"></i>BGP</span><span><i class="g-pt"></i>포인트</span><span><i class="g-res"></i>보관 tKRW</span></div>
         </div>
+
         <div class="card">
-          <h2>컨트랙트</h2>
-          <div id="contractLinks"></div>
+          <h3>참여 매장</h3>
+          <div id="storeList" class="store-list"></div>
         </div>
       </div>
 
-      <div id="ownerArea" class="card hidden">
-        <h2>매장 등록 <span class="tag">운영자</span></h2>
-        <div class="form">
-          <label>매장 주소<input id="storeAddr" type="text" placeholder="0x..." /></label>
-          <label>이름<input id="storeName" type="text" placeholder="학생식당" /></label>
-          <label>적립률 (500 = 5%)<input id="storeBps" type="number" min="0" max="2000" step="1" value="0" /></label>
+      <div class="card">
+        <div class="section-title"><h3>온체인 기록</h3><button id="reloadEvents" class="btn tiny">새로고침</button></div>
+        <ol id="events" class="timeline"><li class="muted">불러오는 중…</li></ol>
+      </div>
+
+      <details class="card fold">
+        <summary><h3>발표 증거 · 이 브라우저에서 보낸 거래</h3></summary>
+        <div class="fold-body">
+          <div class="row-end"><button id="copyLog" class="btn tiny">표로 복사</button><button id="clearLog" class="btn tiny">지우기</button></div>
+          <div id="txLog"></div>
+        </div>
+      </details>
+
+      <details class="card fold">
+        <summary><h3>컨트랙트 정보</h3></summary>
+        <div class="fold-body" id="contractLinks"></div>
+      </details>
+
+      <details id="ownerArea" class="card fold hidden">
+        <summary><h3>매장 등록 <span class="pill orange">운영자</span></h3></summary>
+        <div class="fold-body form3">
+          <label class="field"><span>매장 주소</span><input id="storeAddr" type="text" placeholder="0x..." /></label>
+          <label class="field"><span>이름</span><input id="storeName" type="text" placeholder="학생식당" /></label>
+          <label class="field"><span>적립률 (500 = 5%)</span><input id="storeBps" type="number" min="0" max="2000" step="1" value="0" /></label>
           <button id="addStoreBtn" class="btn primary" data-needs-wallet>등록</button>
         </div>
-      </div>
-
-      <div class="card">
-        <h2>온체인 거래 기록 <button id="reloadEvents" class="btn link small">새로고침</button></h2>
-        <div id="events"><p class="empty">메타마스크를 연결하면 불러와요.</p></div>
-      </div>
-
-      <div class="card">
-        <h2>이 브라우저에서 보낸 거래 <button id="copyLog" class="btn link small">표로 복사</button> <button id="clearLog" class="btn link small">지우기</button></h2>
-        <p class="hint">발표 증거용이에요. 거래 해시와 Etherscan 링크가 쌓여요.</p>
-        <div id="txLog"><p class="empty">아직 없어요.</p></div>
-      </div>
+      </details>
     </section>
   </main>
+
+  <!-- 시트 (충전 / 반환) -->
+  <div id="sheet" class="overlay hidden">
+    <div class="sheet">
+      <div class="sheet-h"><h3 id="sheetTitle">-</h3><button class="x" data-close>✕</button></div>
+      <div id="sheetBody"></div>
+    </div>
+  </div>
+
+  <!-- 거래 진행 -->
+  <div id="progress" class="overlay hidden">
+    <div class="sheet">
+      <div class="sheet-h"><h3 id="progTitle">거래 진행 중</h3></div>
+      <ol id="progSteps" class="prog"></ol>
+      <p id="progMsg" class="muted"></p>
+      <button id="progClose" class="btn block hidden">닫기</button>
+    </div>
+  </div>
 
   <div id="toast" class="toast hidden"></div>
 
