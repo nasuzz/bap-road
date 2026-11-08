@@ -56,6 +56,10 @@ npx hardhat run scripts/demo.js   # 시나리오 잔액표 출력
 
 ## 웹 화면 실행
 
+**온라인 주소: https://nasuzz.github.io/bap-road/** (main에 `web/` 변경을 push하면 GitHub Actions가 자동으로 다시 배포해요)
+
+로컬에서 띄우려면:
+
 1. `web/config.js`에 배포한 `tkrw`, `babgil` 주소와 `deployBlock`을 넣어요. (현재 Sepolia 배포 주소가 들어 있어요)
 2. `npm run web` → 브라우저에서 http://localhost:5173 접속
 3. 지갑 없이도 **전체 현황**(돈의 흐름, 지급 재원, 매장 정산, 온체인 기록)은 바로 보여요.
