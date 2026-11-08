@@ -33,13 +33,13 @@
     <div class="hero-text">
       <span class="eyebrow">밥길 포인트</span>
       <h2>식당에서 쌓은 포인트,<br />카페에서도 그대로.</h2>
-      <p>학생은 충전한 토큰(BGP)으로 결제하고, 포인트는 모든 참여 매장에서 함께 써요.<br />돈은 스마트 컨트랙트가 보관하고, 결제와 동시에 매장에 정산돼요.</p>
+      <p>학생은 충전한 토큰(BGP)으로 결제하고, 포인트는 모든 참여 매장에서 함께 써요.<br />충전한 돈은 스마트 컨트랙트 금고에 들어가고, 결제와 동시에 금고에서 매장으로 정산돼요.</p>
       <button id="heroConnect" class="btn primary lg">메타마스크로 시작하기</button>
     </div>
     <ol class="hero-steps">
       <li><span>1</span><b>충전</b><small>tKRW → BGP</small></li>
       <li><span>2</span><b>결제</b><small>BGP · 포인트</small></li>
-      <li><span>3</span><b>적립</b><small>매장이 재원 부담</small></li>
+      <li><span>3</span><b>적립</b><small>매장이 비용 부담</small></li>
       <li><span>4</span><b>정산</b><small>매장에 즉시 지급</small></li>
     </ol>
   </section>
@@ -166,7 +166,7 @@
         <div class="flow-node core">
           <div class="fn-ic">🔐</div>
           <b>밥길 컨트랙트</b>
-          <div class="fn-v"><span id="fReserve">-</span><small>tKRW 보관</small></div>
+          <div class="fn-v"><span id="fReserve">-</span><small>금고 잔액</small></div>
           <div id="fBacked" class="fn-badge">-</div>
         </div>
         <div class="flow-arrow"><span>tKRW 정산</span></div>
@@ -179,13 +179,13 @@
 
       <div class="grid2">
         <div class="card">
-          <h3>지급 재원</h3>
-          <p class="muted">필요 재원 = BGP 총공급 + 미사용 포인트. 보관 tKRW가 이보다 크거나 같아야 해요.</p>
+          <h3>금고</h3>
+          <p class="muted">학생들의 BGP와 포인트는 언젠가 매장에 지급하거나 학생에게 돌려줘야 하는 돈이에요.<br /><b>금고 잔액</b>이 <b>내줘야 할 돈</b>(BGP + 포인트)보다 크거나 같으면 안전해요.</p>
           <div class="gauge">
-            <div class="g-row"><span>필요 재원</span><div class="g-bar"><i id="gBgp" class="g-bgp"></i><i id="gPt" class="g-pt"></i></div><b id="gRequired">-</b></div>
-            <div class="g-row"><span>보관 tKRW</span><div class="g-bar"><i id="gReserve" class="g-res"></i></div><b id="gReserveV">-</b></div>
+            <div class="g-row"><span>내줘야 할 돈</span><div class="g-bar"><i id="gBgp" class="g-bgp"></i><i id="gPt" class="g-pt"></i></div><b id="gRequired">-</b></div>
+            <div class="g-row"><span>금고 잔액</span><div class="g-bar"><i id="gReserve" class="g-res"></i></div><b id="gReserveV">-</b></div>
           </div>
-          <div class="legend"><span><i class="g-bgp"></i>BGP</span><span><i class="g-pt"></i>포인트</span><span><i class="g-res"></i>보관 tKRW</span></div>
+          <div class="legend"><span><i class="g-bgp"></i>BGP</span><span><i class="g-pt"></i>포인트</span><span><i class="g-res"></i>금고 잔액</span></div>
         </div>
 
         <div class="card">

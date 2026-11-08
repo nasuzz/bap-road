@@ -245,7 +245,7 @@ input:focus, select:focus { outline: 3px solid var(--brand-soft); border-color: 
 @keyframes flow { to { background-position: 20px 0; } }
 
 .gauge { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
-.g-row { display: grid; grid-template-columns: 70px 1fr 70px; align-items: center; gap: 10px; font-size: 13px; }
+.g-row { display: grid; grid-template-columns: 84px 1fr 64px; align-items: center; gap: 10px; font-size: 13px; }
 .g-row span { color: var(--muted); }
 .g-row b { text-align: right; font-variant-numeric: tabular-nums; }
 .g-bar { height: 14px; border-radius: 999px; background: #eef1ee; overflow: hidden; display: flex; }

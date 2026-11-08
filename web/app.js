@@ -519,7 +519,7 @@ function renderOverview() {
   $("fPoints").textContent = fmt(t.totalPoints);
   $("fReserve").textContent = fmt(t.reserve);
   $("fStores").textContent = fmt(storeSum);
-  $("fBacked").textContent = t.backed ? "재원 충분 ✓" : "재원 부족";
+  $("fBacked").textContent = t.backed ? "금고 충분 ✓" : "금고 부족";
   $("fBacked").className = "fn-badge" + (t.backed ? "" : " bad");
 
   const max = Number(t.required > t.reserve ? t.required : t.reserve) || 1;
@@ -593,7 +593,7 @@ async function loadEvents() {
           const parts = [a.pointsUsed > 0n ? `포인트 ${fmt(a.pointsUsed)}` : "", a.bgpUsed > 0n ? `BGP ${fmt(a.bgpUsed)}` : ""].filter(Boolean).join(" + ");
           return [`주문 #${a.orderId} 결제 · ${parts}`, `${esc(label(a.store))}에 ${fmt(a.bgpUsed + a.pointsUsed)} tKRW 바로 지급`];
         }
-        case "PointsAwarded": return [`${esc(label(a.buyer))} +${fmt(a.points)}P 적립`, `${esc(label(a.store))}가 ${fmt(a.points)} tKRW를 재원으로 부담 (주문 #${a.orderId})`];
+        case "PointsAwarded": return [`${esc(label(a.buyer))} +${fmt(a.points)}P 적립`, `${esc(label(a.store))}가 ${fmt(a.points)} tKRW를 금고에 넣어 부담 (주문 #${a.orderId})`];
         case "OrderRefunded": return [`주문 #${a.orderId} 환불`, `BGP ${fmt(a.bgpRestored)} + 포인트 ${fmt(a.pointsRestored)} 복구`];
         default: return [ev.fragment.name, ""];
       }
@@ -780,8 +780,8 @@ $("storeArea").addEventListener("click", guard(async (e) => {
   if (!o) return;
   if (e.target.classList.contains("awardBtn")) {
     const reward = (o.amount * BigInt(S.myStore.rewardBps)) / 10000n;
-    if (S.tkrw < reward) throw new Error(`적립 재원 tKRW가 부족해요 (필요 ${fmt(reward)}).`);
-    const approve = await approveStep(reward, `적립 재원 tKRW ${fmt(reward)} 사용 승인`);
+    if (S.tkrw < reward) throw new Error(`적립에 쓸 tKRW가 부족해요 (필요 ${fmt(reward)}).`);
+    const approve = await approveStep(reward, `적립용 tKRW ${fmt(reward)} 사용 승인`);
     await flow("포인트 적립", [approve, [`주문 #${id} · ${label(o.buyer)}에게 ${fmt(reward)}P 적립`, () => bgpW.awardPoints(id)]]);
   }
   if (e.target.classList.contains("refundBtn")) {
