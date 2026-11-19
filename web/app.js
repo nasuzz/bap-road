@@ -89,6 +89,10 @@ function storeIcon(name = "") {
   if (/편의|마트/i.test(name)) return "🛒";
   return "🍚";
 }
+function menuImage(store, name) {
+  const entry = Object.entries(CONFIG.menuImages || {}).find(([a]) => same(a, store));
+  return entry?.[1]?.[name.trim()] ?? null;
+}
 function menuOf(store) {
   return S.menus[store?.toLowerCase()] ?? [];
 }
@@ -434,7 +438,12 @@ function renderOrderForm() {
     ? menu
         .map((m) => {
           const q = S.cart.qty[m.id] ?? 0;
+          const img = menuImage(S.cart.store, m.name);
+          const pic = img
+            ? `<img class="menu-pic" src="${esc(img)}" alt="${esc(m.name)}" loading="lazy" />`
+            : `<div class="menu-pic none">${storeIcon(storeOf(S.cart.store)?.name)}</div>`;
           return `<div class="menu-item ${q ? "sel" : ""} ${m.available ? "" : "off"}">
+            ${pic}
             <b>${esc(m.name)}</b><span class="price">${fmt(m.price)}원${m.available ? "" : " · 품절"}</span>
             <div class="qty"><button type="button" data-item="${m.id}" data-d="-1" ${q ? "" : "disabled"}>−</button><span>${q}</span>
               <button type="button" data-item="${m.id}" data-d="1" ${m.available && q < 100 ? "" : "disabled"}>+</button></div>

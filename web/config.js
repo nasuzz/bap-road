@@ -13,6 +13,13 @@ export const CONFIG = {
   deployBlock: 12166120,
 
   // 주소 옆에 보여줄 이름. 매장 이름은 컨트랙트에서 자동으로 읽어요.
+  // 메뉴 사진: 매장 주소 → { "메뉴 이름(컨트랙트에 등록한 이름과 똑같이)": "사진 경로" }
+  menuImages: {
+    "0x142DAEb09bdC4de45bC64835002AA11E4C5bD85A": { // 신의한컵
+      "제육알밥": "img/menu/shinui-jeyuk-albap.jpg",
+    },
+  },
+
   labels: {
     "0x9275a30A72E0d3DA391e2956aA9b778f5117c8C6": "운영자",
     "0xB56f978082d29D0A722cCA7894fA181dB51Eca25": "학생",
