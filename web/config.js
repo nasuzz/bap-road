@@ -28,6 +28,5 @@ export const CONFIG = {
 
   labels: {
     "0x9275a30A72E0d3DA391e2956aA9b778f5117c8C6": "운영자",
-    "0xB56f978082d29D0A722cCA7894fA181dB51Eca25": "학생",
   },
 };
