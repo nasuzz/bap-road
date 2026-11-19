@@ -7,10 +7,10 @@ export const CONFIG = {
   rpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
 
   tkrw: "0x8645F7b1465DC39186209b57162c7F14BF0a24b3", // TKRW
-  babgil: "0x5836eba87b307c8993E56D3968dC1f27e4f7A585", // BabgilPoint (메뉴 주문 버전)
+  babgil: "0xe8eA5d7F25dbf1651e75eB6FC9AEa741eeCc5538", // BabgilPoint (메뉴 주문 버전)
 
   // 거래 내역을 이 블록부터 읽어요 (BabgilPoint 배포 블록)
-  deployBlock: 12166120,
+  deployBlock: 12167045,
 
   // 주소 옆에 보여줄 이름. 매장 이름은 컨트랙트에서 자동으로 읽어요.
   // 메뉴 사진: 매장 주소 → { "메뉴 이름(컨트랙트에 등록한 이름과 똑같이)": "사진 경로" }

@@ -9,14 +9,15 @@
 |---|---|
 | 네트워크 | Sepolia (chainId 11155111) |
 | TKRW | [`0x8645F7b1465DC39186209b57162c7F14BF0a24b3`](https://sepolia.etherscan.io/address/0x8645F7b1465DC39186209b57162c7F14BF0a24b3) (v1과 같은 토큰) |
-| BabgilPoint (BGP) | [`0x5836eba87b307c8993E56D3968dC1f27e4f7A585`](https://sepolia.etherscan.io/address/0x5836eba87b307c8993E56D3968dC1f27e4f7A585) |
-| 배포 블록 / 거래 | 12166120 / [`0x9c6ae6ec…45e3`](https://sepolia.etherscan.io/tx/0x9c6ae6ecf93017026e31867909b6bdc81b7e92670646dc11d6302e15b31445e3) |
+| BabgilPoint (BGP) | [`0xe8eA5d7F25dbf1651e75eB6FC9AEa741eeCc5538`](https://sepolia.etherscan.io/address/0xe8eA5d7F25dbf1651e75eB6FC9AEa741eeCc5538) |
+| 배포 블록 / 거래 | 12167045 / [`0xbdf943fc…39e6`](https://sepolia.etherscan.io/tx/0xbdf943fc08800095a66e68bd87df7d4cb283fbdbbdbdfb79f7e468a6809939e6) |
+| 이전 v2 주소 | [`0x5836eba87b307c8993E56D3968dC1f27e4f7A585`](https://sepolia.etherscan.io/address/0x5836eba87b307c8993E56D3968dC1f27e4f7A585) (같은 코드, 운영자 테스트 주문이 남아 있어 시연 전에 새로 배포) |
 | 컴파일러 | Remix, solc 0.8.24 |
 
 ### 진행 상황
 
-- [x] BabgilPoint v2 배포
-- [ ] 매장 등록 (학생식당 500, 교내카페 0, 제2학생식당 500)
+- [x] BabgilPoint v2 재배포 (시연용 깨끗한 상태)
+- [ ] 매장 등록 (신의한컵 500, 카페나무 0, 제순식당 500, 리플커피 500)
 - [ ] 매장별 메뉴 등록
 - [ ] 시나리오 다시 실행 (충전 → 식당 주문·접수 → 적립 → 카페 혼합 결제·접수 → 반환)
 - [ ] 막히는 장면 시연 (거절, 시간 초과 후 돌려받기, 중복 접수 등)
