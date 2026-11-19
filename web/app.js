@@ -424,8 +424,38 @@ function cartInfo() {
   return { lines, total, pts, bgp, reward };
 }
 
+function myLastOrder() {
+  const mine = S.orders.filter((o) => same(o.buyer, account));
+  return mine[mine.length - 1] ?? null;
+}
+
+/** 학생 화면 무한이: 매장이 적립해 준 직후엔 배부름, 다음 주문을 고르기 시작하면 다시 배고픔 */
+function renderMascot(c) {
+  const last = myLastOrder();
+  const full = !!last && last.status === STATUS.ACCEPTED && last.rewardPoints > 0n && !c.lines.length && same(S.cart.store, last.store);
+  let msg;
+  if (full) msg = `배불러요! ${label(last.store)}에서 +${fmt(last.rewardPoints)}P 적립`;
+  else if (last?.status === STATUS.PLACED) msg = `${label(last.store)} 접수를 기다리는 중…`;
+  else if (last?.status === STATUS.ACCEPTED && last.rewardPoints === 0n && rewardOf(last) > 0n && same(S.cart.store, last.store)) msg = "냠냠… 적립을 기다리는 중";
+  else if (c.lines.length) msg = `${c.lines.map((l) => l.item.name).join(", ")} 먹고 싶어요!`;
+  else if (last) msg = `이번엔 ${label(S.cart.store)}에서 뭘 먹을까?`;
+  else msg = "배고파요… 메뉴를 골라 주세요!";
+  const mood = full ? "full" : "hungry";
+  const fig = $("mascot");
+  if (fig.dataset.mood !== mood) {
+    fig.dataset.mood = mood;
+    $("mascotImg").src = `./img/mascot/${mood}.png`;
+    $("mascotImg").alt = full ? "배부른 무한이" : "배고픈 무한이";
+  }
+  $("mascotMsg").textContent = msg;
+}
+
 function renderOrderForm() {
-  if (!S.cart.store || !storeOf(S.cart.store)) S.cart = { store: S.stores[0]?.addr ?? null, qty: {} };
+  if (!S.cart.store || !storeOf(S.cart.store)) {
+    // 처음엔 마지막으로 주문한 매장을 보여줘요 (없으면 첫 매장)
+    const last = myLastOrder();
+    S.cart = { store: (last && storeOf(last.store) ? last.store : S.stores[0]?.addr) ?? null, qty: {} };
+  }
   $("storePicker").innerHTML = S.stores.length
     ? S.stores
         .map((st) => `<button type="button" class="store-pick ${same(st.addr, S.cart.store) ? "on" : ""}" data-store="${st.addr}">
@@ -453,6 +483,7 @@ function renderOrderForm() {
     : `<div class="empty-mini">이 매장은 아직 메뉴가 없어요.</div>`;
 
   const c = cartInfo();
+  renderMascot(c);
   $("cartBox").classList.toggle("hidden", !c.lines.length);
   if (!c.lines.length) return;
   $("cartLines").innerHTML = c.lines
