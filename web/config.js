@@ -22,6 +22,7 @@ export const CONFIG = {
     "0x57421a5176a04cD4b16884D0350a11D243E76375": { // 리플커피
       "아메리카노": "img/menu/ripple-americano.jpg",
       "아이스아메리카노": "img/menu/ripple-americano.jpg",
+      "아샷추": "img/menu/ripple-ashotchu.jpg",
     },
   },
 
