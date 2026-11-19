@@ -407,9 +407,11 @@ th { color: var(--muted); font-weight: 500; }
 /* ---------- 학생 화면 마스코트 (주문 진행에 따라 배고픔 / 배부름) ---------- */
 .side { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 16px; }
 .mascot { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.mascot img { width: 100%; max-width: 300px; aspect-ratio: 1 / 1; display: block; transition: transform .25s ease; }
+.mascot { align-items: stretch; }
+.mascot img { width: 100%; aspect-ratio: 380 / 325; object-fit: contain; background: #014893; display: block; border-radius: 24px; box-shadow: 0 12px 32px rgba(0, 52, 102, .28); transition: transform .25s ease; }
+.mascot figcaption { align-self: center; }
 .mascot[data-mood="full"] img { animation: bounce .6s ease; }
 .mascot figcaption { font-size: 14px; font-weight: 700; color: var(--brand-ink); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; text-align: center; }
 .mascot[data-mood="full"] figcaption { color: var(--point-ink); background: var(--point-soft); border-color: transparent; }
 @keyframes bounce { 0% { transform: scale(.92); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
-@media (max-width: 960px) { .mascot img { max-width: 200px; } }
+@media (max-width: 960px) { .mascot img { max-width: 380px; margin: 0 auto; } }
