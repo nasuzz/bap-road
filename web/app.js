@@ -6,24 +6,31 @@ import { BABGIL_ABI, TKRW_ABI } from "./abi.js";
 // 상수 / 상태
 // ===========================================================================
 
-const STATUS = { NONE: 0, CREATED: 1, PAID: 2, REFUNDED: 3 };
+const STATUS = { NONE: 0, PLACED: 1, ACCEPTED: 2, REJECTED: 3, CANCELLED: 4, REFUNDED: 5 };
 
 const ERROR_KO = {
   ZeroAddress: "주소가 비어 있어요.",
   ZeroAmount: "금액은 1 이상이어야 해요.",
+  EmptyName: "이름을 입력해 주세요.",
   AlreadyRegistered: "이미 등록된 매장이에요.",
   InvalidRewardRate: "적립률은 0~2000(20%) 사이여야 해요.",
-  InvalidDuration: "결제 가능 시간은 1초~1일 사이여야 해요.",
-  NotRegisteredStore: "등록된 매장 계정이 아니에요.",
-  NotOrderStore: "이 주문을 만든 매장만 할 수 있어요.",
-  NotOrderBuyer: "이 주문의 구매자만 결제할 수 있어요.",
-  InvalidOrderStatus: "주문 상태가 맞지 않아요. (이미 결제 / 환불됐거나 없는 주문)",
-  OrderExpired: "결제 가능 시간이 지났어요. 매장에 새 주문을 요청해 주세요.",
+  NotRegisteredStore: "등록된 매장이 아니에요.",
+  MenuFull: "메뉴는 50개까지 등록할 수 있어요.",
+  InvalidMenuItem: "없는 메뉴예요.",
+  MenuItemUnavailable: "지금 판매하지 않는 메뉴가 있어요.",
+  EmptyOrder: "메뉴를 하나 이상 골라 주세요.",
+  TooManyLines: "한 번에 20가지 메뉴까지 주문할 수 있어요.",
+  LengthMismatch: "주문 정보가 올바르지 않아요.",
+  InvalidQuantity: "수량은 1~100개 사이여야 해요.",
+  NotOrderStore: "이 주문을 받은 매장만 할 수 있어요.",
+  NotOrderBuyer: "주문한 학생만 취소할 수 있어요. (접수 시간이 지나면 누구나 돌려줄 수 있어요)",
+  InvalidOrderStatus: "주문 상태가 맞지 않아요. (이미 처리됐거나 없는 주문)",
+  AcceptWindowClosed: "접수 시간(30분)이 지나서 접수할 수 없어요. 거절해서 학생에게 돌려주세요.",
   PointsExceedAmount: "주문 금액보다 많은 포인트는 쓸 수 없어요.",
   InsufficientPoints: "보유 포인트가 부족해요.",
   AlreadyRewarded: "이미 적립한 주문이에요.",
-  NoRewardForStore: "이 매장은 적립률이 0%라 적립할 수 없어요.",
-  RewardedOrderNotRefundable: "포인트가 적립된 주문은 이번 범위에서 환불할 수 없어요.",
+  NoReward: "이 주문은 적립할 포인트가 없어요. (적립률 0% 매장이거나 포인트로만 결제)",
+  RewardedOrderNotRefundable: "포인트가 적립된 주문은 환불할 수 없어요.",
   ERC20InsufficientBalance: "잔액이 부족해요.",
   ERC20InsufficientAllowance: "tKRW 사용 승인(approve)이 부족해요.",
   SafeERC20FailedOperation: "토큰 전송이 실패해서 전체 거래가 취소됐어요.",
@@ -41,13 +48,14 @@ const S = {
   myStore: null, // { name, rewardBps }
   stores: [], // { addr, name, rewardBps, tkrw }
   orders: [],
-  students: [], // 충전 이력이 있는 주소
+  menus: {}, // 매장 주소(소문자) → [{ id, name, price, available }]
+  cart: { store: null, qty: {} }, // 학생 장바구니 (메뉴 번호 → 수량)
+  usePoints: true,
   totals: null,
   points: 0n,
   bgp: 0n,
   tkrw: 0n,
   busy: false,
-  orderMin: 10n,
   tabChosen: false,
 };
 
@@ -80,6 +88,20 @@ function storeIcon(name = "") {
   if (/카페|커피|cafe/i.test(name)) return "☕";
   if (/편의|마트/i.test(name)) return "🛒";
   return "🍚";
+}
+function menuOf(store) {
+  return S.menus[store?.toLowerCase()] ?? [];
+}
+function linesText(o) {
+  const menu = menuOf(o.store);
+  return (o.lines || []).map((l) => `${menu[l.itemId]?.name ?? `메뉴 ${l.itemId}`}${l.quantity > 1 ? ` ×${l.quantity}` : ""}`).join(", ");
+}
+function paidText(o) {
+  return [o.paidPoints > 0n ? `포인트 ${fmt(o.paidPoints)}` : "", o.paidBgp > 0n ? `BGP ${fmt(o.paidBgp)}` : ""].filter(Boolean).join(" + ") || "-";
+}
+function rewardOf(o) {
+  const st = storeOf(o.store);
+  return st ? (o.paidBgp * BigInt(st.rewardBps)) / 10000n : 0n;
 }
 function parseIntValue(raw, name) {
   raw = String(raw).trim();
@@ -127,7 +149,7 @@ function saveLog(log) { try { localStorage.setItem(LOG_KEY, JSON.stringify(log))
 
 function setBusy(b) {
   S.busy = b;
-  document.querySelectorAll("[data-needs-wallet], .pay-card button, .ticket button").forEach((btn) => {
+  document.querySelectorAll("[data-needs-wallet], .pay-card button, .ticket button, .menu-admin button").forEach((btn) => {
     if (btn.dataset.lock === "1") return; // 만료 등 고정 비활성
     btn.disabled = b || !account || !bgpW;
   });
@@ -244,17 +266,19 @@ async function refresh() {
 
     S.stores = await Promise.all(
       storeAddrs.map(async (addr) => {
-        const [s, bal] = await Promise.all([bgpR.stores(addr), tkrwR.balanceOf(addr)]);
+        const [s, bal, menu] = await Promise.all([bgpR.stores(addr), tkrwR.balanceOf(addr), bgpR.getMenu(addr)]);
+        S.menus[addr.toLowerCase()] = menu.map((m, id) => ({ id, name: m.name, price: m.price, available: m.available }));
         return { addr, name: s.name, rewardBps: Number(s.rewardBps), tkrw: bal };
       })
     );
 
     S.orders = await Promise.all(
       Array.from({ length: Number(count) }, (_, i) => i + 1).map(async (id) => {
-        const o = await bgpR.getOrder(id);
+        const [o, lines] = await Promise.all([bgpR.getOrder(id), bgpR.getOrderLines(id)]);
         return {
-          id, buyer: o.buyer, store: o.store, amount: o.amount, expiresAt: Number(o.expiresAt), status: Number(o.status),
-          paidBgp: o.paidBgp, paidPoints: o.paidPoints, rewardPoints: o.rewardPoints,
+          id, buyer: o.buyer, store: o.store, amount: o.amount, placedAt: Number(o.placedAt), deadline: Number(o.acceptDeadline),
+          status: Number(o.status), paidBgp: o.paidBgp, paidPoints: o.paidPoints, rewardPoints: o.rewardPoints,
+          lines: lines.map((l) => ({ itemId: Number(l.itemId), quantity: Number(l.quantity), unitPrice: l.unitPrice })),
         };
       })
     );
@@ -313,7 +337,7 @@ function selectTab(name) {
 
 function timerText(expiresAt) {
   const left = expiresAt - now();
-  if (left <= 0) return "만료됨";
+  if (left <= 0) return "접수 시간 지남";
   const m = Math.floor(left / 60), s = left % 60;
   return `${m}:${String(s).padStart(2, "0")} 남음`;
 }
@@ -328,108 +352,119 @@ function renderStudent() {
   $("sPoints").textContent = fmt(S.points);
   $("sTkrw").textContent = fmt(S.tkrw);
 
-  // 입력 중인 값 보존 (자동 새로고침 대비)
-  const kept = {};
-  document.querySelectorAll("#pendingOrders .pay-card").forEach((el) => {
-    kept[el.dataset.id] = { all: el.querySelector(".useAll")?.checked, pts: el.querySelector(".ptsInput")?.value, touched: el.dataset.touched === "1" };
-  });
+  renderOrderForm();
 
-  const pending = S.orders.filter((o) => same(o.buyer, account) && o.status === STATUS.CREATED);
-  const live = pending.filter((o) => o.expiresAt > now());
-  $("pendingCount").textContent = live.length;
-  $("pendingCount").classList.toggle("zero", !live.length);
-
+  // 진행 중인 주문 (접수 대기)
+  const pending = S.orders.filter((o) => same(o.buyer, account) && o.status === STATUS.PLACED).reverse();
+  $("pendingCount").textContent = pending.length;
+  $("pendingCount").classList.toggle("zero", !pending.length);
   $("pendingOrders").innerHTML = pending.length
     ? pending
-        .slice()
-        .reverse()
         .map((o) => {
           const st = storeOf(o.store);
-          const expired = o.expiresAt <= now();
-          const maxPts = min(S.points, o.amount);
+          const over = o.deadline <= now();
           return `
-          <div class="pay-card ${expired ? "expired" : ""}" data-id="${o.id}">
+          <div class="pay-card ${over ? "expired" : ""}" data-id="${o.id}">
             <div class="pay-head">
               <div class="store-ic">${storeIcon(st?.name)}</div>
-              <div class="info"><b>${esc(label(o.store))}</b><small>주문 #${o.id} · <span class="timer" data-expires="${o.expiresAt}">${timerText(o.expiresAt)}</span></small></div>
+              <div class="info"><b>${esc(label(o.store))}</b><small>주문 #${o.id} · ${over ? "접수 시간 지남" : `접수 대기 · <span class="timer" data-expires="${o.deadline}">${timerText(o.deadline)}</span>`}</small></div>
               <div class="amt">${fmt(o.amount)}원</div>
             </div>
-            <div class="split-bar"><i class="pt"></i><i class="bgp"></i></div>
-            <div class="legend"><span><i class="pt"></i>포인트 <b class="vPt">0</b></span><span><i class="bgp"></i>BGP <b class="vBgp">0</b></span></div>
-            <div class="pay-opts">
-              <label class="switch-row"><input type="checkbox" class="switch useAll" ${maxPts > 0n ? "" : "disabled"} />
-                <span>포인트 먼저 쓰기<small>보유 ${fmt(S.points)}P · 최대 ${fmt(maxPts)}P 사용 가능</small></span></label>
-              <label class="custom-pts">직접 <input type="number" class="ptsInput" min="0" max="${maxPts}" step="1" value="0" />P</label>
-            </div>
-            <p class="warn-text hidden"></p>
-            <button class="btn primary block lg payBtn" ${expired ? 'disabled data-lock="1"' : ""}>${expired ? "결제 시간이 지났어요" : "결제하기"}</button>
+            <p class="order-lines">${esc(linesText(o))}<br />결제: ${paidText(o)} · 금고에 잡혀 있어요</p>
+            <button class="btn ${over ? "primary" : ""} block cancelBtn" data-id="${o.id}">${over ? "돌려받기" : "주문 취소"}</button>
           </div>`;
         })
         .join("")
-    : `<div class="empty-mini">아직 결제 요청이 없어요.<br />매장에서 주문을 등록하면 여기에 나타나요.</div>`;
-
-  // 기본값: 포인트가 있으면 '포인트 먼저 쓰기' 켜기
-  document.querySelectorAll("#pendingOrders .pay-card").forEach((card) => {
-    const k = kept[card.dataset.id];
-    const all = card.querySelector(".useAll");
-    const input = card.querySelector(".ptsInput");
-    if (k?.touched) {
-      card.dataset.touched = "1";
-      all.checked = !!k.all && !all.disabled;
-      input.value = k.pts ?? "0";
-    } else if (!all.disabled) {
-      all.checked = true;
-      const o = S.orders.find((x) => x.id === Number(card.dataset.id));
-      input.value = String(min(S.points, o.amount));
-    }
-    updatePayCard(card);
-  });
+    : `<div class="empty-mini">접수를 기다리는 주문이 없어요.</div>`;
 
   // 이용 내역
-  const mine = S.orders.filter((o) => same(o.buyer, account) && o.status !== STATUS.CREATED).reverse();
+  const mine = S.orders.filter((o) => same(o.buyer, account) && o.status !== STATUS.PLACED).reverse();
   $("myOrders").innerHTML = mine.length
     ? mine
         .map((o) => {
           const st = storeOf(o.store);
-          const parts = [o.paidBgp > 0n ? `BGP ${fmt(o.paidBgp)}` : "", o.paidPoints > 0n ? `포인트 ${fmt(o.paidPoints)}` : ""].filter(Boolean).join(" + ");
-          const refunded = o.status === STATUS.REFUNDED;
-          const reward = o.rewardPoints > 0n
-            ? `<span class="pill orange">+${fmt(o.rewardPoints)}P 적립</span>`
-            : st?.rewardBps && !refunded ? `<span class="pill gray">적립 대기</span>` : "";
+          let badge = "";
+          let cls = "minus";
+          if (o.status === STATUS.ACCEPTED) {
+            badge = o.rewardPoints > 0n
+              ? `<span class="pill orange">+${fmt(o.rewardPoints)}P 적립</span>`
+              : rewardOf(o) > 0n ? `<span class="pill gray">적립 대기</span>` : `<span class="pill gray">접수 완료</span>`;
+          } else {
+            cls = "refund";
+            badge = {
+              [STATUS.REJECTED]: `<span class="pill red">매장 거절 · 돌려받음</span>`,
+              [STATUS.CANCELLED]: `<span class="pill gray">취소 · 돌려받음</span>`,
+              [STATUS.REFUNDED]: `<span class="pill blue">환불 완료</span>`,
+            }[o.status] ?? "";
+          }
           return `<li class="hist">
             <div class="store-ic">${storeIcon(st?.name)}</div>
-            <div class="mid"><b>${esc(label(o.store))}</b><small>주문 #${o.id} · ${parts || "-"}</small></div>
-            <div class="right"><b class="${refunded ? "refund" : "minus"}">${fmt(o.amount)}원</b>${refunded ? `<span class="pill blue">환불 완료</span>` : reward}</div>
+            <div class="mid"><b>${esc(label(o.store))}</b><small>#${o.id} · ${esc(linesText(o))} · ${paidText(o)}</small></div>
+            <div class="right"><b class="${cls}">${fmt(o.amount)}원</b>${badge}</div>
           </li>`;
         })
         .join("")
     : `<li class="hist"><div class="mid"><small>아직 이용 내역이 없어요.</small></div></li>`;
 }
 
-function updatePayCard(card) {
-  const o = S.orders.find((x) => x.id === Number(card.dataset.id));
-  if (!o) return;
-  const raw = card.querySelector(".ptsInput").value.trim();
-  const pts = /^\d+$/.test(raw) ? BigInt(raw) : 0n;
-  const over = pts > o.amount || pts > S.points;
-  const usePts = over ? 0n : pts;
-  const need = o.amount - usePts;
-  const total = Number(o.amount) || 1;
-  card.querySelector(".split-bar .pt").style.width = `${(Number(usePts) / total) * 100}%`;
-  card.querySelector(".split-bar .bgp").style.width = `${(Number(need) / total) * 100}%`;
-  card.querySelector(".vPt").textContent = fmt(usePts);
-  card.querySelector(".vBgp").textContent = fmt(need);
+function cartInfo() {
+  const menu = menuOf(S.cart.store);
+  const lines = Object.entries(S.cart.qty)
+    .map(([id, q]) => ({ item: menu[Number(id)], qty: q }))
+    .filter((l) => l.item && l.qty > 0);
+  const total = lines.reduce((acc, l) => acc + l.item.price * BigInt(l.qty), 0n);
+  const pts = S.usePoints ? min(S.points, total) : 0n;
+  const bgp = total - pts;
+  const st = storeOf(S.cart.store);
+  const reward = st ? (bgp * BigInt(st.rewardBps)) / 10000n : 0n;
+  return { lines, total, pts, bgp, reward };
+}
 
-  const warn = card.querySelector(".warn-text");
-  const btn = card.querySelector(".payBtn");
-  let msg = "";
-  if (over) msg = "포인트는 주문 금액과 보유 포인트를 넘을 수 없어요.";
-  else if (need > S.bgp) msg = `BGP가 ${fmt(need - S.bgp)} 부족해요. 먼저 충전해 주세요.`;
-  warn.textContent = msg;
-  warn.classList.toggle("hidden", !msg);
-  if (btn.dataset.lock !== "1") {
-    btn.textContent = usePts > 0n ? `포인트 ${fmt(usePts)}P + ${fmt(need)} BGP 결제` : `${fmt(need)} BGP 결제`;
-  }
+function renderOrderForm() {
+  if (!S.cart.store || !storeOf(S.cart.store)) S.cart = { store: S.stores[0]?.addr ?? null, qty: {} };
+  $("storePicker").innerHTML = S.stores.length
+    ? S.stores
+        .map((st) => `<button type="button" class="store-pick ${same(st.addr, S.cart.store) ? "on" : ""}" data-store="${st.addr}">
+          <span class="store-ic">${storeIcon(st.name)}</span>${esc(st.name)}${st.rewardBps ? ` <small>${st.rewardBps / 100}% 적립</small>` : ""}</button>`)
+        .join("")
+    : `<div class="empty-mini">등록된 매장이 없어요.</div>`;
+
+  const menu = menuOf(S.cart.store);
+  $("menuGrid").innerHTML = menu.length
+    ? menu
+        .map((m) => {
+          const q = S.cart.qty[m.id] ?? 0;
+          return `<div class="menu-item ${q ? "sel" : ""} ${m.available ? "" : "off"}">
+            <b>${esc(m.name)}</b><span class="price">${fmt(m.price)}원${m.available ? "" : " · 품절"}</span>
+            <div class="qty"><button type="button" data-item="${m.id}" data-d="-1" ${q ? "" : "disabled"}>−</button><span>${q}</span>
+              <button type="button" data-item="${m.id}" data-d="1" ${m.available && q < 100 ? "" : "disabled"}>+</button></div>
+          </div>`;
+        })
+        .join("")
+    : `<div class="empty-mini">이 매장은 아직 메뉴가 없어요.</div>`;
+
+  const c = cartInfo();
+  $("cartBox").classList.toggle("hidden", !c.lines.length);
+  if (!c.lines.length) return;
+  $("cartLines").innerHTML = c.lines
+    .map((l) => `<li><span>${esc(l.item.name)} × ${l.qty}</span><span>${fmt(l.item.price * BigInt(l.qty))}원</span></li>`)
+    .join("");
+  $("cartTotal").textContent = `${fmt(c.total)}원`;
+  const t = Number(c.total) || 1;
+  $("cartBarPt").style.width = `${(Number(c.pts) / t) * 100}%`;
+  $("cartBarBgp").style.width = `${(Number(c.bgp) / t) * 100}%`;
+  $("cartPt").textContent = fmt(c.pts);
+  $("cartBgp").textContent = fmt(c.bgp);
+  $("cartReward").textContent = c.reward > 0n ? `접수 후 +${fmt(c.reward)}P 적립 예정` : "";
+  $("usePoints").checked = S.usePoints && S.points > 0n;
+  $("usePoints").disabled = S.points === 0n;
+  $("pointsHint").textContent = `보유 ${fmt(S.points)}P · 포인트로 낸 금액에는 적립되지 않아요`;
+  const warn = c.bgp > S.bgp ? `BGP가 ${fmt(c.bgp - S.bgp)} 부족해요. 먼저 충전해 주세요.` : "";
+  $("cartWarn").textContent = warn;
+  $("cartWarn").classList.toggle("hidden", !warn);
+  $("placeOrderBtn").textContent = c.pts > 0n
+    ? `포인트 ${fmt(c.pts)}P + ${fmt(c.bgp)} BGP로 주문하기`
+    : `${fmt(c.bgp)} BGP로 주문하기`;
 }
 
 // ===========================================================================
@@ -443,47 +478,64 @@ function renderStore() {
   if (!st) return;
 
   const mine = S.orders.filter((o) => same(o.store, account)).reverse();
-  const wait = mine.filter((o) => o.status === STATUS.CREATED);
-  const todo = mine.filter((o) => o.status === STATUS.PAID && st.rewardBps > 0 && o.rewardPoints === 0n);
+  const wait = mine.filter((o) => o.status === STATUS.PLACED);
+  const todo = mine.filter((o) => o.status === STATUS.ACCEPTED && o.rewardPoints === 0n && rewardOf(o) > 0n);
   const done = mine.filter((o) => !wait.includes(o) && !todo.includes(o));
 
   $("stIcon").textContent = storeIcon(st.name);
   $("stName").textContent = st.name;
-  $("stRate").textContent = st.rewardBps ? `결제 금액의 ${st.rewardBps / 100}% 적립` : "적립 없음";
+  $("stRate").textContent = st.rewardBps ? `BGP 결제액의 ${st.rewardBps / 100}% 적립` : "적립 없음";
   $("stRate").className = "pill " + (st.rewardBps ? "orange" : "gray");
   $("stTkrw").textContent = fmt(S.tkrw);
-  $("stWaiting").textContent = wait.filter((o) => o.expiresAt > now()).length;
+  $("stWaiting").textContent = wait.filter((o) => o.deadline > now()).length;
   $("stPendingReward").textContent = todo.length;
 
-  // 구매자 선택 목록 (충전 이력 + 라벨)
-  const sel = $("orderBuyerSel");
-  const prev = sel.value;
-  const known = new Map();
-  Object.entries(CONFIG.labels || {}).forEach(([a, n]) => { if (!storeOf(a) && n !== "운영자") known.set(a.toLowerCase(), { a, n }); });
-  S.students.forEach((a) => { if (!known.has(a.toLowerCase()) && !storeOf(a)) known.set(a.toLowerCase(), { a, n: short(a) }); });
-  sel.innerHTML =
-    [...known.values()].map(({ a, n }) => `<option value="${a}">${esc(n)} · ${short(a)}</option>`).join("") +
-    `<option value="__custom">직접 입력…</option>`;
-  if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
-  $("orderBuyer").classList.toggle("hidden", sel.value !== "__custom");
-  updatePreview();
+  // 메뉴 관리 (수정 중인 값은 자동 새로고침에도 유지)
+  const kept = {};
+  document.querySelectorAll("#menuAdmin li[data-dirty='1']").forEach((li) => {
+    kept[li.dataset.id] = { price: li.querySelector(".mPrice").value, on: li.querySelector(".mOn").checked };
+  });
+  const menu = menuOf(account);
+  $("menuAdmin").innerHTML = menu.length
+    ? menu
+        .map((m) => {
+          const k = kept[m.id];
+          return `<li data-id="${m.id}" class="${m.available ? "" : "off"}" ${k ? 'data-dirty="1"' : ""}>
+            <b title="${esc(m.name)}">${esc(m.name)}</b>
+            <input class="mPrice" type="number" min="1" step="1" value="${k ? esc(k.price) : m.price}" />
+            <input type="checkbox" class="switch mOn" title="판매 중" ${(k ? k.on : m.available) ? "checked" : ""} />
+            <button class="btn tiny saveMenuBtn" data-id="${m.id}">저장</button>
+          </li>`;
+        })
+        .join("")
+    : `<li class="empty-mini">아직 메뉴가 없어요. 아래에서 추가해 주세요.</li>`;
 
   const ticket = (o) => {
-    const reward = (o.amount * BigInt(st.rewardBps)) / 10000n;
-    const expired = o.status === STATUS.CREATED && o.expiresAt <= now();
-    const canReward = o.status === STATUS.PAID && reward > 0n && o.rewardPoints === 0n;
-    const canRefund = o.status === STATUS.PAID && o.rewardPoints === 0n;
+    const reward = rewardOf(o);
+    const over = o.status === STATUS.PLACED && o.deadline <= now();
     let meta = "";
-    if (o.status === STATUS.CREATED) meta = expired ? `<span class="pill red">만료</span>` : `<span class="timer" data-expires="${o.expiresAt}">${timerText(o.expiresAt)}</span>`;
-    else if (o.status === STATUS.REFUNDED) meta = `<span class="pill blue">환불 완료</span>`;
-    else meta = [o.paidBgp > 0n ? `BGP ${fmt(o.paidBgp)}` : "", o.paidPoints > 0n ? `포인트 ${fmt(o.paidPoints)}` : ""].filter(Boolean).join(" + ") +
-      (o.rewardPoints > 0n ? ` · <span class="pill orange">${fmt(o.rewardPoints)}P 적립</span>` : "");
-    const actions = [
-      canReward ? `<button class="btn point sm awardBtn" data-id="${o.id}">${fmt(reward)}P 적립</button>` : "",
-      canRefund ? `<button class="btn danger sm refundBtn" data-id="${o.id}">환불</button>` : "",
-    ].join("");
+    let actions = "";
+    if (o.status === STATUS.PLACED) {
+      meta = over
+        ? `<span class="pill red">접수 시간 지남</span>`
+        : `<span class="timer" data-expires="${o.deadline}">${timerText(o.deadline)}</span> · ${paidText(o)}`;
+      actions = (over ? "" : `<button class="btn primary sm acceptBtn" data-id="${o.id}">접수</button>`) +
+        `<button class="btn danger sm rejectBtn" data-id="${o.id}">${over ? "학생에게 돌려주기" : "거절"}</button>`;
+    } else {
+      const state = {
+        [STATUS.REJECTED]: `<span class="pill red">거절</span>`,
+        [STATUS.CANCELLED]: `<span class="pill gray">취소됨</span>`,
+        [STATUS.REFUNDED]: `<span class="pill blue">환불 완료</span>`,
+      }[o.status];
+      meta = state ?? paidText(o) + (o.rewardPoints > 0n ? ` · <span class="pill orange">${fmt(o.rewardPoints)}P 적립</span>` : "");
+      if (o.status === STATUS.ACCEPTED && o.rewardPoints === 0n) {
+        actions = (reward > 0n ? `<button class="btn point sm awardBtn" data-id="${o.id}">${fmt(reward)}P 적립</button>` : "") +
+          `<button class="btn danger sm refundBtn" data-id="${o.id}">환불</button>`;
+      }
+    }
     return `<div class="ticket">
       <div class="t-top"><b>${fmt(o.amount)}원</b><small>#${o.id} · ${esc(label(o.buyer))}</small></div>
+      <div class="t-lines">${esc(linesText(o))}</div>
       <div class="t-meta">${meta}</div>
       ${actions ? `<div class="t-actions">${actions}</div>` : ""}
     </div>`;
@@ -492,19 +544,9 @@ function renderStore() {
     $(id).innerHTML = list.length ? list.map(ticket).join("") : `<div class="empty-mini">${emptyMsg}</div>`;
     $(id + "N").textContent = list.length;
   };
-  lane("laneWait", wait, "학생 결제를 기다리는 주문이 없어요");
+  lane("laneWait", wait, "들어온 주문이 없어요");
   lane("laneTodo", todo, "적립할 주문이 없어요");
   lane("laneDone", done, "아직 없어요");
-}
-
-function updatePreview() {
-  const sel = $("orderBuyerSel");
-  const who = sel.value === "__custom" ? ($("orderBuyer").value.trim() ? short($("orderBuyer").value.trim()) : "구매자") : sel.selectedOptions[0]?.textContent?.split(" · ")[0] ?? "구매자";
-  const amt = /^\d+$/.test($("orderAmt").value) ? fmt($("orderAmt").value) : "-";
-  const st = S.myStore;
-  const reward = st?.rewardBps && /^\d+$/.test($("orderAmt").value) ? (BigInt($("orderAmt").value) * BigInt(st.rewardBps)) / 10000n : 0n;
-  $("orderPreview").innerHTML = `<b>${esc(who)}</b>에게 <b>${amt}원</b> 결제 요청을 보내요. ${S.orderMin}분 안에 결제해야 해요.` +
-    (reward > 0n ? `<br />결제 후 적립하면 매장이 <b>${fmt(reward)} tKRW</b>를 부담하고 학생에게 <b>${fmt(reward)}P</b>가 쌓여요.` : "");
 }
 
 // ===========================================================================
@@ -548,10 +590,14 @@ function renderOverview() {
 
 const EV_META = {
   StoreAdded: { ic: "🏪", cls: "" },
+  MenuItemAdded: { ic: "📋", cls: "" },
+  MenuItemUpdated: { ic: "📋", cls: "" },
   Deposited: { ic: "💳", cls: "deposit" },
   Redeemed: { ic: "↩️", cls: "deposit" },
-  OrderCreated: { ic: "🧾", cls: "" },
-  OrderPaid: { ic: "✅", cls: "pay" },
+  OrderPlaced: { ic: "🧾", cls: "" },
+  OrderAccepted: { ic: "✅", cls: "pay" },
+  OrderRejected: { ic: "✋", cls: "refund" },
+  OrderCancelled: { ic: "✋", cls: "refund" },
   PointsAwarded: { ic: "⭐", cls: "reward" },
   OrderRefunded: { ic: "↩️", cls: "refund" },
 };
@@ -573,9 +619,6 @@ async function loadEvents() {
       .filter(Boolean)
       .sort((a, b) => b.blockNumber - a.blockNumber || b.index - a.index);
 
-    S.students = [...new Set(events.filter((e) => e.fragment.name === "Deposited").map((e) => e.args.student))];
-    if (S.myStore) renderStore();
-
     const blocks = {};
     await Promise.all([...new Set(events.slice(0, 40).map((e) => e.blockNumber))].map(async (n) => {
       try { blocks[n] = (await readProvider.getBlock(n))?.timestamp; } catch {}
@@ -588,11 +631,15 @@ async function loadEvents() {
         case "StoreAdded": return [`매장 등록 · ${esc(a.name)}`, `적립률 ${Number(a.rewardBps) / 100}%`];
         case "Deposited": return [`${esc(label(a.student))} 충전 ${fmt(a.amount)} BGP`, `tKRW ${fmt(a.amount)}을 맡기고 같은 수량의 BGP 발행`];
         case "Redeemed": return [`${esc(label(a.student))} BGP ${fmt(a.amount)} 반환`, `BGP 소각 → tKRW ${fmt(a.amount)} 돌려받음`];
-        case "OrderCreated": return [`${esc(label(a.store))} 주문 #${a.orderId} · ${fmt(a.amount)}원`, `구매자 ${esc(label(a.buyer))}`];
-        case "OrderPaid": {
+        case "MenuItemAdded": return [`${esc(label(a.store))} 메뉴 추가 · ${esc(a.name)}`, `${fmt(a.price)}원`];
+        case "MenuItemUpdated": return [`${esc(label(a.store))} 메뉴 변경 · ${esc(menuOf(a.store)[Number(a.itemId)]?.name ?? `#${a.itemId}`)}`, `${fmt(a.price)}원 · ${a.available ? "판매 중" : "판매 중지"}`];
+        case "OrderPlaced": {
           const parts = [a.pointsUsed > 0n ? `포인트 ${fmt(a.pointsUsed)}` : "", a.bgpUsed > 0n ? `BGP ${fmt(a.bgpUsed)}` : ""].filter(Boolean).join(" + ");
-          return [`주문 #${a.orderId} 결제 · ${parts}`, `${esc(label(a.store))}에 ${fmt(a.bgpUsed + a.pointsUsed)} tKRW 바로 지급`];
+          return [`${esc(label(a.buyer))} → ${esc(label(a.store))} 주문 #${a.orderId} · ${fmt(a.amount)}원`, `${parts} 결제, 금고에 잡아둠`];
         }
+        case "OrderAccepted": return [`${esc(label(a.store))} 주문 #${a.orderId} 접수`, `금고에서 ${fmt(a.amount)} tKRW 정산`];
+        case "OrderRejected": return [`${esc(label(a.store))} 주문 #${a.orderId} 거절`, `${esc(label(a.buyer))}에게 BGP·포인트 돌려줌`];
+        case "OrderCancelled": return [`주문 #${a.orderId} 취소`, `${esc(label(a.buyer))}에게 BGP·포인트 돌려줌`];
         case "PointsAwarded": return [`${esc(label(a.buyer))} +${fmt(a.points)}P 적립`, `${esc(label(a.store))}가 ${fmt(a.points)} tKRW를 금고에 넣어 부담 (주문 #${a.orderId})`];
         case "OrderRefunded": return [`주문 #${a.orderId} 환불`, `BGP ${fmt(a.bgpRestored)} + 포인트 ${fmt(a.pointsRestored)} 복구`];
         default: return [ev.fragment.name, ""];
@@ -715,71 +762,79 @@ $("faucetBtn").addEventListener("click", () => flow("시연용 tKRW 받기", [["
 $("sheet").addEventListener("click", (e) => { if (e.target.id === "sheet" || e.target.dataset.close !== undefined) closeSheet(); });
 $("progClose").addEventListener("click", () => $("progress").classList.add("hidden"));
 
-// 결제 카드
-$("pendingOrders").addEventListener("input", (e) => {
-  const card = e.target.closest(".pay-card");
-  if (!card) return;
-  card.dataset.touched = "1";
-  if (e.target.classList.contains("ptsInput")) card.querySelector(".useAll").checked = false;
-  updatePayCard(card);
+// 학생 주문
+$("storePicker").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-store]");
+  if (!b || same(b.dataset.store, S.cart.store)) return;
+  S.cart = { store: b.dataset.store, qty: {} };
+  renderOrderForm();
 });
-$("pendingOrders").addEventListener("change", (e) => {
-  const card = e.target.closest(".pay-card");
-  if (!card || !e.target.classList.contains("useAll")) return;
-  card.dataset.touched = "1";
-  const o = S.orders.find((x) => x.id === Number(card.dataset.id));
-  card.querySelector(".ptsInput").value = e.target.checked ? String(min(S.points, o.amount)) : "0";
-  updatePayCard(card);
+$("menuGrid").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-item]");
+  if (!b) return;
+  const id = Number(b.dataset.item);
+  const q = Math.max(0, Math.min(100, (S.cart.qty[id] ?? 0) + Number(b.dataset.d)));
+  if (q) S.cart.qty[id] = q;
+  else delete S.cart.qty[id];
+  renderOrderForm();
 });
+$("usePoints").addEventListener("change", (e) => { S.usePoints = e.target.checked; renderOrderForm(); });
+$("placeOrderBtn").addEventListener("click", guard(async () => {
+  const c = cartInfo();
+  if (!c.lines.length) throw new Error(ERROR_KO.EmptyOrder);
+  if (c.lines.some((l) => !l.item.available)) throw new Error(ERROR_KO.MenuItemUnavailable);
+  if (c.bgp > S.bgp) throw new Error(`BGP가 부족해요 (필요 ${fmt(c.bgp)}, 보유 ${fmt(S.bgp)}).`);
+  const store = S.cart.store;
+  const ids = c.lines.map((l) => l.item.id);
+  const qtys = c.lines.map((l) => l.qty);
+  const desc = c.pts > 0n ? `포인트 ${fmt(c.pts)}P + BGP ${fmt(c.bgp)}` : `BGP ${fmt(c.bgp)}`;
+  const what = c.lines.map((l) => `${l.item.name}×${l.qty}`).join(", ");
+  const ok = await flow(`${label(store)} 주문`, [[`${what} · ${desc}`, () => bgpW.placeOrder(store, ids, qtys, c.pts)]]);
+  if (ok) { S.cart.qty = {}; renderOrderForm(); }
+}));
 $("pendingOrders").addEventListener("click", guard(async (e) => {
-  if (!e.target.classList.contains("payBtn")) return;
-  const card = e.target.closest(".pay-card");
-  const id = Number(card.dataset.id);
-  const o = S.orders.find((x) => x.id === id);
-  const raw = card.querySelector(".ptsInput").value.trim() || "0";
-  if (!/^\d+$/.test(raw)) throw new Error("포인트는 0 이상의 정수로 입력해 주세요.");
-  const pts = BigInt(raw);
-  if (pts > o.amount) throw new Error(ERROR_KO.PointsExceedAmount);
-  if (pts > S.points) throw new Error(ERROR_KO.InsufficientPoints);
-  if (o.amount - pts > S.bgp) throw new Error(`BGP가 부족해요 (필요 ${fmt(o.amount - pts)}, 보유 ${fmt(S.bgp)}).`);
-  const desc = pts > 0n ? `포인트 ${fmt(pts)}P + BGP ${fmt(o.amount - pts)}` : `BGP ${fmt(o.amount)}`;
-  await flow(`${label(o.store)} 결제`, [[`주문 #${id} · ${desc}`, () => bgpW.pay(id, pts)]]);
+  if (!e.target.classList.contains("cancelBtn")) return;
+  const id = Number(e.target.dataset.id);
+  if (!confirm(`주문 #${id}을(를) 취소하고 결제한 BGP·포인트를 돌려받을까요?`)) return;
+  await flow("주문 취소", [[`주문 #${id} 취소 · 돌려받기`, () => bgpW.cancelOrder(id)]]);
 }));
 
-// 매장 주문 등록
-$("orderBuyerSel").addEventListener("change", () => {
-  $("orderBuyer").classList.toggle("hidden", $("orderBuyerSel").value !== "__custom");
-  updatePreview();
-});
-$("orderBuyer").addEventListener("input", updatePreview);
-$("orderAmt").addEventListener("input", updatePreview);
-$("amtChips").addEventListener("click", (e) => {
-  if (!e.target.dataset.amt) return;
-  $("orderAmt").value = e.target.dataset.amt;
-  updatePreview();
-});
-$("minChips").addEventListener("click", (e) => {
-  if (!e.target.dataset.min) return;
-  S.orderMin = BigInt(e.target.dataset.min);
-  $("minChips").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.target));
-  updatePreview();
-});
-$("createOrderBtn").addEventListener("click", guard(async () => {
-  const sel = $("orderBuyerSel").value;
-  const raw = sel === "__custom" ? $("orderBuyer").value.trim() : sel;
-  if (!ethers.isAddress(raw)) throw new Error("구매자 주소가 올바르지 않아요.");
-  const buyer = ethers.getAddress(raw);
-  const amt = parseIntValue($("orderAmt").value, "금액");
-  await flow("결제 요청 보내기", [[`${label(buyer)}에게 ${fmt(amt)}원 주문`, () => bgpW.createOrder(buyer, amt, S.orderMin * 60n)]]);
+// 매장 메뉴 관리
+$("addMenuBtn").addEventListener("click", guard(async () => {
+  const name = $("newMenuName").value.trim();
+  if (!name) throw new Error("메뉴 이름을 입력해 주세요.");
+  const price = parseIntValue($("newMenuPrice").value, "가격");
+  const ok = await flow("메뉴 추가", [[`${name} ${fmt(price)}원`, () => bgpW.addMenuItem(name, price)]]);
+  if (ok) { $("newMenuName").value = ""; $("newMenuPrice").value = ""; }
+}));
+const markDirty = (e) => { const li = e.target.closest("li"); if (li) li.dataset.dirty = "1"; };
+$("menuAdmin").addEventListener("input", markDirty);
+$("menuAdmin").addEventListener("change", markDirty);
+$("menuAdmin").addEventListener("click", guard(async (e) => {
+  if (!e.target.classList.contains("saveMenuBtn")) return;
+  const li = e.target.closest("li");
+  const id = Number(li.dataset.id);
+  const price = parseIntValue(li.querySelector(".mPrice").value, "가격");
+  const on = li.querySelector(".mOn").checked;
+  const name = menuOf(account)[id]?.name ?? `메뉴 ${id}`;
+  delete li.dataset.dirty;
+  await flow("메뉴 변경", [[`${name} · ${fmt(price)}원 · ${on ? "판매 중" : "판매 중지"}`, () => bgpW.updateMenuItem(id, price, on)]]);
 }));
 
-// 매장 주문 카드 (적립 / 환불)
+// 매장 주문 카드 (접수 / 거절 / 적립 / 환불)
 $("storeArea").addEventListener("click", guard(async (e) => {
   const id = Number(e.target.dataset.id);
   const o = S.orders.find((x) => x.id === id);
   if (!o) return;
+  if (e.target.classList.contains("acceptBtn")) {
+    await flow("주문 접수", [[`주문 #${id} 접수 · ${fmt(o.amount)} tKRW 정산`, () => bgpW.acceptOrder(id)]]);
+  }
+  if (e.target.classList.contains("rejectBtn")) {
+    if (!confirm(`주문 #${id}을(를) 거절할까요?\n\n학생에게 ${paidText(o)}가 그대로 돌아가요.`)) return;
+    await flow("주문 거절", [[`주문 #${id} 거절 · 학생에게 돌려주기`, () => bgpW.rejectOrder(id)]]);
+  }
   if (e.target.classList.contains("awardBtn")) {
-    const reward = (o.amount * BigInt(S.myStore.rewardBps)) / 10000n;
+    const reward = rewardOf(o);
     if (S.tkrw < reward) throw new Error(`적립에 쓸 tKRW가 부족해요 (필요 ${fmt(reward)}).`);
     const approve = await approveStep(reward, `적립용 tKRW ${fmt(reward)} 사용 승인`);
     await flow("포인트 적립", [approve, [`주문 #${id} · ${label(o.buyer)}에게 ${fmt(reward)}P 적립`, () => bgpW.awardPoints(id)]]);

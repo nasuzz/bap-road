@@ -33,14 +33,14 @@
     <div class="hero-text">
       <span class="eyebrow">밥길 포인트</span>
       <h2>식당에서 쌓은 포인트,<br />카페에서도 그대로.</h2>
-      <p>학생은 충전한 토큰(BGP)으로 결제하고, 포인트는 모든 참여 매장에서 함께 써요.<br />충전한 돈은 스마트 컨트랙트 금고에 들어가고, 결제와 동시에 금고에서 매장으로 정산돼요.</p>
+      <p>메뉴를 골라 충전한 토큰(BGP)과 포인트로 결제하면, 매장이 주문을 접수해요.<br />결제한 돈은 스마트 컨트랙트 금고에 잡혀 있다가 접수되는 순간 매장으로 정산되고, 거절되면 그대로 돌아와요.</p>
       <button id="heroConnect" class="btn primary lg">메타마스크로 시작하기</button>
     </div>
     <ol class="hero-steps">
       <li><span>1</span><b>충전</b><small>tKRW → BGP</small></li>
-      <li><span>2</span><b>결제</b><small>BGP · 포인트</small></li>
-      <li><span>3</span><b>적립</b><small>매장이 비용 부담</small></li>
-      <li><span>4</span><b>정산</b><small>매장에 즉시 지급</small></li>
+      <li><span>2</span><b>주문·결제</b><small>메뉴 선택 · BGP + 포인트</small></li>
+      <li><span>3</span><b>매장 접수</b><small>금고 → 매장 정산</small></li>
+      <li><span>4</span><b>적립</b><small>매장이 비용 부담</small></li>
     </ol>
   </section>
 
@@ -53,7 +53,7 @@
   <main>
     <!-- ================= 학생 ================= -->
     <section id="tab-student" class="panel hidden">
-      <div class="need-wallet empty-state hidden"><div class="big">🎓</div><p>지갑을 연결하면 내 잔액과 결제 요청이 보여요.</p></div>
+      <div class="need-wallet empty-state hidden"><div class="big">🎓</div><p>지갑을 연결하면 내 잔액과 주문 화면이 보여요.</p></div>
 
       <div class="wallet-area">
         <div class="wallet-card">
@@ -74,7 +74,24 @@
         </div>
 
         <div class="col">
-          <div class="section-title"><h3>결제 요청</h3><span id="pendingCount" class="count">0</span></div>
+          <div class="section-title"><h3>주문하기</h3></div>
+          <div class="card order-card">
+            <div id="storePicker" class="store-picker"></div>
+            <div id="menuGrid" class="menu-grid"></div>
+            <div id="cartBox" class="cart hidden">
+              <ul id="cartLines" class="cart-lines"></ul>
+              <div class="cart-total"><span>주문 금액</span><b id="cartTotal">0원</b></div>
+              <div class="split-bar"><i class="pt" id="cartBarPt"></i><i class="bgp" id="cartBarBgp"></i></div>
+              <div class="legend"><span><i class="pt"></i>포인트 <b id="cartPt">0</b></span><span><i class="bgp"></i>BGP <b id="cartBgp">0</b></span><span id="cartReward" class="reward-hint"></span></div>
+              <label class="switch-row"><input type="checkbox" id="usePoints" class="switch" checked />
+                <span>포인트 먼저 쓰기<small id="pointsHint">-</small></span></label>
+              <p id="cartWarn" class="warn-text hidden"></p>
+              <button id="placeOrderBtn" class="btn primary block lg" data-needs-wallet>주문하고 결제하기</button>
+              <p class="muted tiny-note">결제한 BGP·포인트는 금고에 잡혀 있다가 매장이 접수하면 정산돼요. 30분 안에 접수되지 않거나 거절되면 그대로 돌려받아요.</p>
+            </div>
+          </div>
+
+          <div class="section-title"><h3>진행 중인 주문</h3><span id="pendingCount" class="count">0</span></div>
           <div id="pendingOrders" class="stack"></div>
 
           <div class="section-title"><h3>이용 내역</h3></div>
@@ -99,45 +116,26 @@
           </div>
           <div class="store-kpis">
             <div><small>정산 받은 tKRW</small><b id="stTkrw">0</b></div>
-            <div><small>결제 대기</small><b id="stWaiting">0</b></div>
+            <div><small>접수 대기</small><b id="stWaiting">0</b></div>
             <div><small>적립 대기</small><b id="stPendingReward">0</b></div>
           </div>
         </div>
 
         <div class="pos">
           <div class="card pos-form">
-            <h3>새 주문</h3>
-            <label class="field">
-              <span>구매자</span>
-              <select id="orderBuyerSel"></select>
-              <input id="orderBuyer" class="hidden" type="text" placeholder="0x... 학생 지갑 주소" />
-            </label>
-            <label class="field">
-              <span>금액</span>
-              <div class="amount-input"><input id="orderAmt" type="number" min="1" step="1" value="6000" /><em>원</em></div>
-              <div class="chips" id="amtChips">
-                <button type="button" data-amt="3000">3,000</button>
-                <button type="button" data-amt="4500">4,500</button>
-                <button type="button" data-amt="6000">6,000</button>
-                <button type="button" data-amt="9000">9,000</button>
-              </div>
-            </label>
-            <div class="field">
-              <span>결제 가능 시간</span>
-              <div class="chips" id="minChips">
-                <button type="button" data-min="5">5분</button>
-                <button type="button" data-min="10" class="on">10분</button>
-                <button type="button" data-min="30">30분</button>
-                <button type="button" data-min="60">1시간</button>
-              </div>
+            <h3>메뉴 관리</h3>
+            <ul id="menuAdmin" class="menu-admin"></ul>
+            <div class="menu-add">
+              <input id="newMenuName" type="text" placeholder="메뉴 이름 (예: 제육덮밥)" />
+              <div class="amount-input"><input id="newMenuPrice" type="number" min="1" step="1" placeholder="가격" /><em>원</em></div>
+              <button id="addMenuBtn" class="btn primary" data-needs-wallet>메뉴 추가</button>
             </div>
-            <div id="orderPreview" class="preview"></div>
-            <button id="createOrderBtn" class="btn primary block lg" data-needs-wallet>결제 요청 보내기</button>
+            <p class="muted tiny-note">가격을 바꿔도 이미 들어온 주문 금액은 그대로예요.</p>
           </div>
 
           <div class="board">
             <div class="lane">
-              <div class="lane-h"><span class="dot wait"></span>결제 대기 <em id="laneWaitN">0</em></div>
+              <div class="lane-h"><span class="dot wait"></span>접수 대기 <em id="laneWaitN">0</em></div>
               <div id="laneWait" class="stack"></div>
             </div>
             <div class="lane">
@@ -162,14 +160,14 @@
           <div class="fn-v"><span id="fSupply">-</span><small>BGP</small></div>
           <div class="fn-v pt"><span id="fPoints">-</span><small>포인트</small></div>
         </div>
-        <div class="flow-arrow"><span>충전 · 결제</span></div>
+        <div class="flow-arrow"><span>충전 · 주문</span></div>
         <div class="flow-node core">
           <div class="fn-ic">🔐</div>
           <b>밥길 컨트랙트</b>
           <div class="fn-v"><span id="fReserve">-</span><small>금고 잔액</small></div>
           <div id="fBacked" class="fn-badge">-</div>
         </div>
-        <div class="flow-arrow"><span>tKRW 정산</span></div>
+        <div class="flow-arrow"><span>접수 시 정산</span></div>
         <div class="flow-node">
           <div class="fn-ic">🏪</div>
           <b>매장</b>
