@@ -19,6 +19,10 @@ export const CONFIG = {
       "제육알밥": "img/menu/shinui-jeyuk-albap.jpg",
       "김치고기마요": "img/menu/shinui-kimchi-gogi-mayo.jpg",
     },
+    "0x57421a5176a04cD4b16884D0350a11D243E76375": { // 리플커피
+      "아메리카노": "img/menu/ripple-americano.jpg",
+      "아이스아메리카노": "img/menu/ripple-americano.jpg",
+    },
   },
 
   labels: {
