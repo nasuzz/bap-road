@@ -509,7 +509,9 @@ function renderStore() {
     ? menu
         .map((m) => {
           const k = kept[m.id];
+          const img = menuImage(account, m.name);
           return `<li data-id="${m.id}" class="${m.available ? "" : "off"}" ${k ? 'data-dirty="1"' : ""}>
+            ${img ? `<img class="menu-thumb" src="${esc(img)}" alt="" />` : `<span class="menu-thumb none">${storeIcon(st.name)}</span>`}
             <b title="${esc(m.name)}">${esc(m.name)}</b>
             <input class="mPrice" type="number" min="1" step="1" value="${k ? esc(k.price) : m.price}" />
             <input type="checkbox" class="switch mOn" title="판매 중" ${(k ? k.on : m.available) ? "checked" : ""} />
