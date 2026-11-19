@@ -17,6 +17,7 @@ export const CONFIG = {
   menuImages: {
     "0x142DAEb09bdC4de45bC64835002AA11E4C5bD85A": { // 신의한컵
       "제육알밥": "img/menu/shinui-jeyuk-albap.jpg",
+      "김치고기마요": "img/menu/shinui-kimchi-gogi-mayo.jpg",
     },
   },
 
