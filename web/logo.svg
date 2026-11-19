@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="밥길 포인트">
+  <rect width="64" height="64" rx="16" fill="#004E96"/>
+  <!-- 김 -->
+  <path d="M25 6.5c-2.2 2.6 2.2 4.4 0 7" fill="none" stroke="#00B9F2" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M39 6.5c-2.2 2.6 2.2 4.4 0 7" fill="none" stroke="#00B9F2" stroke-width="2.6" stroke-linecap="round"/>
+  <!-- 밥 -->
+  <circle cx="21.5" cy="30" r="8.5" fill="#fff"/>
+  <circle cx="42.5" cy="30" r="8.5" fill="#fff"/>
+  <circle cx="32" cy="26" r="10.5" fill="#fff"/>
+  <!-- 그릇 -->
+  <path d="M9 33h46c0 12.2-10 20.5-23 20.5S9 45.2 9 33z" fill="#FCAF17"/>
+  <rect x="8" y="31" width="48" height="5" rx="2.5" fill="#FFC94D"/>
+  <!-- 얼굴 -->
+  <circle cx="25" cy="42" r="2.3" fill="#3A2700"/>
+  <circle cx="39" cy="42" r="2.3" fill="#3A2700"/>
+  <path d="M29 45.2q3 2.8 6 0" fill="none" stroke="#3A2700" stroke-width="2" stroke-linecap="round"/>
+  <ellipse cx="20.5" cy="46" rx="2.6" ry="1.6" fill="#FF8A5C" opacity=".75"/>
+  <ellipse cx="43.5" cy="46" rx="2.6" ry="1.6" fill="#FF8A5C" opacity=".75"/>
+</svg>
